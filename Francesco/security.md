@@ -261,6 +261,10 @@ Finally TCP traffic on port 6379 would be allowed from these [Pods](pod.md).
 The use of empty ingress or egress rules denies all of type of traffic for the included Pods, though not suggested.
 Use another dedicated `NetworkPolicy` instead.
 
+### Vulnerability list ###
+
+See [Vulnerabilites](vulnerability.md).
+
 ### Random stuff for now ###
 
  * You can check access/permissions with
