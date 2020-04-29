@@ -1,6 +1,9 @@
 import argparse
 import subprocess
 import time
+import requests
+import threading
+#import psutil
 
 def runTool(tool):
     if tool == "cis":
@@ -25,7 +28,7 @@ and rerun it when needed
 """
 def runHunter():
     # Basic invokation of kubectl, we could find better ways using the API
-    trash = subprocess.run(["kubectl", "create", "-f", "kube-hunter-job-json.yaml"])
+    subprocess.run(["kubectl", "create", "-f", "kube-hunter-job-json.yaml"])
     time.sleep(5) #Seems to be needed, I have to check
 
     """
@@ -69,8 +72,17 @@ def runKubesec():
     pass
 
 def runMkit():
-    pass
+    # For the moment we assume that the tool has already been downloaded
+    server = threading.Thread(target=serverRun)
+    server.start()
+    time.sleep(20) #hardcoded, find better way
+    response = requests.get("http://localhost:8000/results.json")
+    json = response.text
+    print(json)
+    return json
 
+def serverRun():
+    subprocess.run(["make", "run-k8s"])
 def runCustom():
     pass
 
