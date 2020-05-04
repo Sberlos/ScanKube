@@ -26,6 +26,8 @@ def runTool(tool):
         print("Unexpected tool") #Shouldn't happen as there is the check before
 
 def runCisBench():
+    """Run aqua-bench (an implementation of the cis benchmark) as Pod
+    """
     ns = "default"
     config.load_kube_config()
     batch_v1 = client.BatchV1Api()
@@ -37,38 +39,21 @@ def runCisBench():
     time.sleep(10) #In the future I will check the status
     # The above could be replaced by a loop on resJob.status
 
-    #### Cannot parse a json string to a dict... ####
-    # The idea is to parse the json to extract the UID to pass to list
-    # namespace event in order to find the name of the pod that ran the job in
-    # order to retrive its logs
-    #
-    # If the json way doens't work I can do using string manipulation but it's
-    # terrible
+    uid = resJob.metadata.labels["controller-uid"]
 
-    #print(str(resJob))
-    #jobDict = json.loads(json.dumps(str(resJob).replace("\'", "\"")))
-    jobDict = eval(json.dumps(str(resJob).replace("\'", "\"")))
-    print(jobDict)
-    print(type(jobDict))
-
-    """
     listEvents = core_v1.list_namespaced_event(ns,
-    field_selector="involvedObject.name=kube-bench")
-    print(listEvents)
-    """
+    #field_selector="involvedObject.name=kube-bench")
+    field_selector="involvedObject.uid={}".format(uid))
+    podName = listEvents.items[0].message.split()[-1]
+
     """
     descriptionJob = core_v1.read_namespaced_event("kube-bench", ns)
     print(descriptionJob)
     """
-    """
-    listJob = batch_v1.list_namespaced_job(namespace=ns)
-    print(listJob)
-    podName = extractName(resJob.metadata)
 
     log = core_v1.read_namespaced_pod_log(name=podName, namespace=ns)
     print(log)
     return log
-    """
 
 def runCisBenchDocker():
     """Run aqua-bench (an implementation of the cis benchmark) as Docker
