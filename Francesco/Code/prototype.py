@@ -130,7 +130,20 @@ def extractJson(log):
     return json
 
 def runKubesec():
-    pass
+    """Run the Kubesec tool agains all yaml files in the cluster
+    """
+    ns = "default"
+    config.load_kube_config()
+    #batch_v1 = client.BatchV1Api()
+    core_v1 = client.AppsV1Api()
+    all_deployments = core_v1.list_deployment_for_all_namespaces()
+    c = 0
+    for i in all_deployments.items:
+        if "kubectl.kubernetes.io/last-applied-configuration" in i.metadata.annotations:
+            with open("checkYaml2_s{}.yaml".format(c), "w") as f:
+                f.write(i.metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])
+        c += 1
+    #TODO do all the other types
 
 def runMkit():
     """Run the mkit tool
