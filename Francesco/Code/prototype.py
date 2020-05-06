@@ -132,18 +132,74 @@ def extractJson(log):
 def runKubesec():
     """Run the Kubesec tool agains all yaml files in the cluster
     """
-    ns = "default"
+    namespaces_list = ["default"]
     config.load_kube_config()
-    #batch_v1 = client.BatchV1Api()
-    core_v1 = client.AppsV1Api()
-    all_deployments = core_v1.list_deployment_for_all_namespaces()
+    batch_v1 = client.BatchV1Api()
+    apps_v1 = client.AppsV1Api()
+
+    files = []
+
+    """
+    #Deployments
+    all_deployments = apps_v1.list_deployment_for_all_namespaces()
+    createYamlFiles(all_deployments, "deployment", files)
+
+    #ReplicaSets
+    all_replica_sets = apps_v1.list_replica_set_for_all_namespaces()
+    createYamlFiles(all_replica_sets, "replicaSet", files)
+
+    #StatefulSets
+    all_stateful_sets = apps_v1.list_stateful_set_for_all_namespaces()
+    createYamlFiles(all_stateful_sets, "statefulSet", files)
+
+    #DaemonSets
+    all_daemon_sets = apps_v1.list_daemon_set_for_all_namespaces()
+    createYamlFiles(all_daemon_sets, "daemonSet", files)
+    """
+
+    #check if we need resources that are namespaced
+    #for ns in namespaces_list:
+
+    resources = [
+            [apps_v1.list_deployment_for_all_namespaces, "deployment"],
+            [apps_v1.list_replica_set_for_all_namespaces, "replicaSet"],
+            [apps_v1.list_stateful_set_for_all_namespaces, "statefulSet"],
+            [apps_v1.list_daemon_set_for_all_namespaces, "daemonSet"],
+            #[batch_v1.list_job_for_all_namespaces, "job"],
+            ]
+
+    # extract the yaml files for every resource specified above
+    for r in resources:
+        listObjects(r[0], r[1], files)
+
+    # Execute kubesec scan on all files created
+    total_scan = []
+    for f in files:
+        out = subprocess.run(["./kubesec", "scan", f], capture_output=True, text=True)
+        total_scan.append(out.stdout)
+        print(out.stdout)
+
+
+def listObjects(function, name, files):
+    """List all objects using the function for their type and create a yaml
+    file with the spec
+    """
+    res = function() #query the API for the objects
+    createYamlFiles(res, name, files)
+
+def createYamlFiles(response, name, files):
+    """Create yaml spec files from the object in the response of the API
+    """
     c = 0
-    for i in all_deployments.items:
+    for i in response.items:
         if "kubectl.kubernetes.io/last-applied-configuration" in i.metadata.annotations:
-            with open("checkYaml2_s{}.yaml".format(c), "w") as f:
+            filename = "{}_{}.yaml".format(name, c)
+            with open(filename, "w") as f:
                 f.write(i.metadata.annotations["kubectl.kubernetes.io/last-applied-configuration"])
-        c += 1
-    #TODO do all the other types
+            files.append(filename)
+            c += 1
+
+
 
 def runMkit():
     """Run the mkit tool
