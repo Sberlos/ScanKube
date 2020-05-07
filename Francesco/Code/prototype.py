@@ -29,37 +29,10 @@ def runTool(tool):
 def runCisBench():
     """Run aqua-bench (an implementation of the cis benchmark) as Pod
     """
-    ns = "default"
-    jobName = "kube-bench"
-    config.load_kube_config()
-    batch_v1 = client.BatchV1Api()
-    core_v1 = client.CoreV1Api()
-    with open(path.join(path.dirname(__file__), "kubebatch-job.yaml")) as f:
-        job = yaml.safe_load(f)
-        resJob = batch_v1.create_namespaced_job(namespace=ns, body=job)
-
-    jobStatus = batch_v1.read_namespaced_job_status(jobName, ns)
-
-    time.sleep(3) #time waiting to start, how to remove the wait?
-    while jobStatus.status.completion_time is None:
-        time.sleep(1)
-        jobStatus = batch_v1.read_namespaced_job_status(jobName, ns)
-
-    uid = resJob.metadata.labels["controller-uid"]
-
-    listEvents = core_v1.list_namespaced_event(ns,
-    #field_selector="involvedObject.name=kube-bench")
-    field_selector="involvedObject.uid={}".format(uid))
-    podName = listEvents.items[0].message.split()[-1]
-
-    """
-    descriptionJob = core_v1.read_namespaced_event("kube-bench", ns)
-    print(descriptionJob)
-    """
-
-    log = core_v1.read_namespaced_pod_log(name=podName, namespace=ns)
-    print(log)
-    return log
+    podLog = runToolAsJob("kube-bench", "kube-bench-job.yaml",
+            "default")
+    print(podLog)
+    return podLog
 
 def runCisBenchDocker():
     """Run aqua-bench (an implementation of the cis benchmark) as Docker
@@ -77,66 +50,17 @@ def runCisBenchDocker():
             tty=False, volumes=volumesDict)
     print(log)
 
-"""
-We have two options: run the job and then delete it or check for its existence
-and rerun it when needed
-"""
 def runHunter():
     """Run kube-hunter
     Creates a Pod in the cluster used to run a Job that will scan the
     environment
     """
-    ns = "default"
-    config.load_kube_config()
-    batch_v1 = client.BatchV1Api()
-    core_v1 = client.CoreV1Api()
-
-    jobName = "kube-hunter-json"
-    hunterJobFilename = "kube-hunter-job-json.yaml"
-
-    with open(path.join(path.dirname(__file__), hunterJobFilename)) as f:
-        hunterJob = yaml.safe_load(f)
-        resJob = batch_v1.create_namespaced_job(namespace=ns, body=hunterJob)
-
-    jobStatus = batch_v1.read_namespaced_job_status(jobName, ns)
-
-    time.sleep(5) #time waiting to start, how to remove the wait?
-    while jobStatus.status.completion_time is None:
-        time.sleep(1)
-        jobStatus = batch_v1.read_namespaced_job_status(jobName, ns)
-
-    uid = resJob.metadata.labels["controller-uid"]
-
-    listEvents = core_v1.list_namespaced_event(ns,
-    field_selector="involvedObject.uid={}".format(uid))
-    podName = listEvents.items[0].message.split()[-1]
-
-    podLog = core_v1.read_namespaced_pod_log(name=podName, namespace=ns)
-
+    podLog = runToolAsJob("kube-hunter-json", "kube-hunter-job-json.yaml",
+            "default")
     jsonReport = extractJson(podLog)
     print(jsonReport)
 
-    batch_v1.delete_namespaced_job(jobName, ns)
-
     return jsonReport
-
-def extractJobNameJob(output):
-    """Extract and return the Job name tied to kube-hunter from a kubectl
-    describe jobs command output
-    """
-    lines = output.splitlines()
-    podName = lines[-1].split()[-1] #check if right
-    print(podName)
-    return podName
-
-def extractJobNamePods(output):
-    """Extract and return the Job name tied to kube-hunter from a kubectl
-    describe pods command output
-    """
-    lines = output.splitlines()
-    podName = lines[0].split()[1] #check if right
-    print(podName)
-    return podName
 
 def extractJson(log):
     """Extract and return the json output from the kube-hunter scan from the
@@ -145,8 +69,35 @@ def extractJson(log):
     if start == -1:
         return "" # add proper error mechanism
     json = log[start:]
-    #print(json)
     return json
+
+def runToolAsJob(jobName, jobFilename, namespace):
+    config.load_kube_config()
+    batch_v1 = client.BatchV1Api()
+    core_v1 = client.CoreV1Api()
+
+    with open(path.join(path.dirname(__file__), jobFilename)) as f:
+        loadedJob = yaml.safe_load(f)
+        resJob = batch_v1.create_namespaced_job(namespace=namespace, body=loadedJob)
+
+    jobStatus = batch_v1.read_namespaced_job_status(jobName, namespace)
+
+    time.sleep(5) #time waiting to start, how to remove the wait?
+    while jobStatus.status.completion_time is None:
+        time.sleep(1)
+        jobStatus = batch_v1.read_namespaced_job_status(jobName, namespace)
+
+    uid = resJob.metadata.labels["controller-uid"]
+
+    listEvents = core_v1.list_namespaced_event(namespace,
+    field_selector="involvedObject.uid={}".format(uid))
+    podName = listEvents.items[0].message.split()[-1]
+
+    podLog = core_v1.read_namespaced_pod_log(name=podName, namespace=namespace)
+
+    batch_v1.delete_namespaced_job(jobName, namespace)
+
+    return podLog
 
 def runKubesec():
     """Run the Kubesec tool agains all yaml files in the cluster
