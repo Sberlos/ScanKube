@@ -2,11 +2,14 @@ from kubernetes import client, config
 
 def complete_fetcher():
     """Fetch all relevant yaml files from the cluster
+    At the moment kubesec supports only deployments, stateful sets, daemon sets
+    and pods
     """
     namespaces_list = ["default"] #not used right now
     config.load_kube_config()
     batch_v1 = client.BatchV1Api()
     apps_v1 = client.AppsV1Api()
+    core_v1 = client.CoreV1Api()
 
     files = []
 
@@ -33,10 +36,11 @@ def complete_fetcher():
 
     resources = [
             [apps_v1.list_deployment_for_all_namespaces, "deployment"],
-            [apps_v1.list_replica_set_for_all_namespaces, "replicaSet"],
+            #[apps_v1.list_replica_set_for_all_namespaces, "replicaSet"],
             [apps_v1.list_stateful_set_for_all_namespaces, "statefulSet"],
             [apps_v1.list_daemon_set_for_all_namespaces, "daemonSet"],
             #[batch_v1.list_job_for_all_namespaces, "job"],
+            #[core_v1.list_pod_for_all_namespaces, "pod"],
             ]
 
     # extract the yaml files for every resource specified above

@@ -30,6 +30,7 @@ def runCisBench():
     """Run aqua-bench (an implementation of the cis benchmark) as Pod
     """
     ns = "default"
+    jobName = "kube-bench"
     config.load_kube_config()
     batch_v1 = client.BatchV1Api()
     core_v1 = client.CoreV1Api()
@@ -37,8 +38,12 @@ def runCisBench():
         job = yaml.safe_load(f)
         resJob = batch_v1.create_namespaced_job(namespace=ns, body=job)
 
-    time.sleep(10) #In the future I will check the status
-    # The above could be replaced by a loop on resJob.status
+    jobStatus = batch_v1.read_namespaced_job_status(jobName, ns)
+
+    time.sleep(3) #time waiting to start, how to remove the wait?
+    while jobStatus.status.completion_time is None:
+        time.sleep(1)
+        jobStatus = batch_v1.read_namespaced_job_status(jobName, ns)
 
     uid = resJob.metadata.labels["controller-uid"]
 
@@ -81,25 +86,38 @@ def runHunter():
     Creates a Pod in the cluster used to run a Job that will scan the
     environment
     """
-    # Basic invokation of kubectl, we could find better ways using the API
-    subprocess.run(["kubectl", "create", "-f", "kube-hunter-job-json.yaml"])
-    time.sleep(5) #Seems to be needed, I have to check
+    ns = "default"
+    config.load_kube_config()
+    batch_v1 = client.BatchV1Api()
+    core_v1 = client.CoreV1Api()
 
-    """
-    describeOutP = subprocess.run(["kubectl", "describe", "job",
-        "kube-hunter-json-test"], capture_output=True, text=True)
-    """
-    describeOutP = subprocess.run(["kubectl", "describe", "pods",
-        "kube-hunter-json-test"], capture_output=True, text=True)
-    describeOut = describeOutP.stdout #not handling errors for now
-    podName = extractJobNamePods(describeOut)
+    jobName = "kube-hunter-json"
+    hunterJobFilename = "kube-hunter-job-json.yaml"
 
-    time.sleep(25) #hardcoded, ideally we should keep describing/checking until completed
-    podLogP = subprocess.run(["kubectl", "logs", podName], capture_output=True,
-            text=True)
-    podLog = podLogP.stdout #not handling errors for now
+    with open(path.join(path.dirname(__file__), hunterJobFilename)) as f:
+        hunterJob = yaml.safe_load(f)
+        resJob = batch_v1.create_namespaced_job(namespace=ns, body=hunterJob)
+
+    jobStatus = batch_v1.read_namespaced_job_status(jobName, ns)
+
+    time.sleep(5) #time waiting to start, how to remove the wait?
+    while jobStatus.status.completion_time is None:
+        time.sleep(1)
+        jobStatus = batch_v1.read_namespaced_job_status(jobName, ns)
+
+    uid = resJob.metadata.labels["controller-uid"]
+
+    listEvents = core_v1.list_namespaced_event(ns,
+    field_selector="involvedObject.uid={}".format(uid))
+    podName = listEvents.items[0].message.split()[-1]
+
+    podLog = core_v1.read_namespaced_pod_log(name=podName, namespace=ns)
 
     jsonReport = extractJson(podLog)
+    print(jsonReport)
+
+    batch_v1.delete_namespaced_job(jobName, ns)
+
     return jsonReport
 
 def extractJobNameJob(output):
@@ -127,7 +145,7 @@ def extractJson(log):
     if start == -1:
         return "" # add proper error mechanism
     json = log[start:]
-    print(json)
+    #print(json)
     return json
 
 def runKubesec():
