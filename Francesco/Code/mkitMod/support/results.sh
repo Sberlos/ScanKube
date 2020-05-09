@@ -19,4 +19,3 @@ OUTPUT_PATH="${HOME}/audit/results/results.json"
 UI_PATH="${HOME}/ui"
 
 cat "${INPUT_PATH}" | ./inspec-results-formatter.rb >> "${OUTPUT_PATH}"
-bash

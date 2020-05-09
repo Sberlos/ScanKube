@@ -99,6 +99,7 @@ def runToolAsJob(jobName, jobFilename, namespace):
     podLog = core_v1.read_namespaced_pod_log(name=podName, namespace=namespace)
 
     batch_v1.delete_namespaced_job(jobName, namespace)
+    core_v1.delete_namespaced_pod(podName, namespace)
 
     return podLog
 
@@ -118,26 +119,9 @@ def runMkit():
     """Run the mkit tool
     Returns the output in json format
     """
-    # For the moment we assume that the tool has already been downloaded
-    """
-    server = threading.Thread(target=serverRun)
-    server.start()
-    #time.sleep(20) #hardcoded, find better way
-    response = requests.get("http://localhost:8000/results.json")
-    json = response.text
-    print(json)
-    """
     with cd("mkitMod"):
+        subprocess.run(["make", "build"])
         subprocess.run(["make", "run-k8s"])
-
-    return json
-
-def serverRun():
-    """Run the mkit server
-    At the moment is just a simple call to make
-    """
-    with cd("mkitMod"):
-        subprocess.run(["make", "run-k8s", "&&", "pwd", "&&", "ls"])
 
 @contextmanager
 def cd(newdir):
