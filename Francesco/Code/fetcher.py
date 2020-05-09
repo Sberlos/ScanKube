@@ -1,4 +1,5 @@
 from kubernetes import client, config
+from pathlib import Path
 
 def complete_fetcher():
     """Fetch all relevant yaml files from the cluster
@@ -59,13 +60,16 @@ def listObjects(function, name, files):
 def createYamlFiles(response, name, files):
     """Create yaml spec files from the object in the response of the API
     """
+    directory = "extracted_objects"
+    Path(directory).mkdir(exist_ok=True)
     c = 0
     for i in response.items:
         if "kubectl.kubernetes.io/last-applied-configuration" in i.metadata.annotations:
             filename = "{}_{}.yaml".format(name, c)
-            with open(filename, "w") as f:
+            path = "{}/{}".format(directory, filename)
+            with open(path, "w") as f:
                 f.write(i.metadata.annotations[
                     "kubectl.kubernetes.io/last-applied-configuration"])
-            files.append(filename)
+            files.append(path)
             c += 1
 
