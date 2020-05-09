@@ -11,6 +11,9 @@ import yaml
 import json
 from fetcher import *
 
+from contextlib import contextmanager
+import os
+
 def runTool(tool):
     """Decide which tool to run based on the argument"""
     if tool == "cis":
@@ -116,19 +119,34 @@ def runMkit():
     Returns the output in json format
     """
     # For the moment we assume that the tool has already been downloaded
+    """
     server = threading.Thread(target=serverRun)
     server.start()
-    time.sleep(20) #hardcoded, find better way
+    #time.sleep(20) #hardcoded, find better way
     response = requests.get("http://localhost:8000/results.json")
     json = response.text
     print(json)
+    """
+    with cd("mkitMod"):
+        subprocess.run(["make", "run-k8s"])
+
     return json
 
 def serverRun():
     """Run the mkit server
     At the moment is just a simple call to make
     """
-    subprocess.run(["make", "run-k8s"])
+    with cd("mkitMod"):
+        subprocess.run(["make", "run-k8s", "&&", "pwd", "&&", "ls"])
+
+@contextmanager
+def cd(newdir):
+    prevdir = os.getcwd()
+    os.chdir(os.path.expanduser(newdir))
+    try:
+        yield
+    finally:
+        os.chdir(prevdir)
 
 def runCustom():
     pass
