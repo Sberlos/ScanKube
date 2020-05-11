@@ -1,31 +1,45 @@
 import argparse
 import subprocess
 import time
-import requests
-import threading
+import os
 from os import path
-#import psutil
+from contextlib import contextmanager
+
 #import docker
 from kubernetes import client, config
 import yaml
 import json
-from fetcher import *
 
-from contextlib import contextmanager
-import os
+from fetcher import *
+from aggregator import *
 
 def runTool(tool):
     """Decide which tool to run based on the argument"""
     if tool == "cis":
-        runCisBench()
+        out = runCisBench()
+        extractFromCis(out)
     elif tool == "kube-hunter":
-        runHunter()
+        hunterOut = runHunter()
+        hunterList = extractFromHunter(hunterOut)
     elif tool == "kubesec":
         runKubesec()
     elif tool == "mkit":
         runMkit()
+        mkitList = extractFromMkit()
     elif tool == "custom":
-        runMkit()
+        runCustom()
+    elif tool == "complete":
+        # All sequencial, could be parallelized if we merge the lists at the
+        # end
+        hunterOut = runHunter()
+        hunterList = extractFromHunter(hunterOut)
+        kubesecOut = runKubesec()
+        tmpList = extractFromKubesec(kubesecOut, hunterList)
+        mkitOut = runMkit()
+        tmpList = extractFromMkit(mkitOut, tmpList)
+        customOut = runCustom()
+        finalList = extractFromCustom(customOut, tmpList)
+        output(finalList)
     else:
         print("Unexpected tool") #Shouldn't happen as there is the check before
 
@@ -59,7 +73,7 @@ def runHunter():
     environment
     """
     podLog = runToolAsJob("kube-hunter-json", "kube-hunter-job-json.yaml",
-            "default")
+            "development")
     jsonReport = extractJson(podLog)
     print(jsonReport)
 
@@ -75,6 +89,11 @@ def extractJson(log):
     return json
 
 def runToolAsJob(jobName, jobFilename, namespace):
+    """Helper function that runs a job in a pod given the name of the job
+    the name of the spec file and the namespace to run.
+    It extracts the log and return it to the parent, then remove the job and
+    the pod.
+    """
     config.load_kube_config()
     batch_v1 = client.BatchV1Api()
     core_v1 = client.CoreV1Api()
@@ -140,7 +159,7 @@ def parsing():
     """Parse the command line arguments"""
     parser = argparse.ArgumentParser()
     parser.add_argument("tool", choices=["cis", "kube-hunter", "kubesec", "mkit",
-        "custom"], help="select the tool to run")
+        "custom", "complete"], help="select the tool to run")
     parser.add_argument("-v", "--verbosity", action="count", default=0,
         help="increase output verbosity")
     args = parser.parse_args()
