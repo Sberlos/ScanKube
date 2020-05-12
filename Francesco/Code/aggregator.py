@@ -8,24 +8,49 @@ def extractFromMkit(resList=[]):
     with open(path, "r") as f:
         content = f.read()
 
-    # TODO this is wrong as we have multiple resources for the same vuln
     jsonP = json.loads(content)
     for result in jsonP["results"]:
-        element = {}
-        element["Location"] = result["category"]
-        element["Name"] = result["title"]
-        element["Category"] = result["category"]
-        element["Severity"] = result["severity"]
-        element["Description"] = result["description"]
-        element["Remediation"] = result["remediation"]
-        element["Evidence"] = result["validation"]
-        resList.append(element)
+        Name = result["title"]
+        Category = result["category"]
+        Severity = normalizeSeverityMkit(result["severity"])
+        Description = result["description"]
+        Remediation = result["remediation"]
+        Evidence = result["validation"]
+        if len(result["resources"]) > 0:
+            for res in result["resources"]:
+                element = {}
+                element["Name"] = Name
+                element["Category"] = Category
+                element["Severity"] = Severity
+                element["Description"] = Description
+                element["Remediation"] = Remediation
+                element["Evidence"] = Evidence
+                element["Location"] = res["resource"]
+                element["Result"] = normalizeResultMkit(res["status"])
+                resList.append(element)
+        else: # This shouldn't happen, just in case
+            element["Location"] = result["category"]
+            element["Result"] = "N/A"
+            resList.append(element)
 
-    """
+
     resJson = json.dumps(resList)
     print(resJson)
-    """
     return resList
+
+def normalizeSeverityMkit(number):
+    if number < 0.4:
+        return "Low"
+    elif number < 0.7:
+        return "Medium"
+    else:
+        return "High"
+
+def normalizeResultMkit(string):
+    if string == "passed":
+        return "Pass"
+    else:
+        return "Fail"
 
 def extractFromCis(output, resList=[]):
     """Extract the relevant fields from kube-bench output and return them
@@ -39,9 +64,10 @@ def extractFromCis(output, resList=[]):
             for result in test["results"]:
                 element = {}
                 element["Location"] = "K8s"
-                element["Name"] = result["test_desc"]
+                element["Name"] = result["test_desc"] #Create a value?
+                element["Result"] = "Pass" if result["status"] == "PASS" else "Fail"
                 element["Category"] = test["desc"]
-                element["Severity"] = result["status"]
+                element["Severity"] = normalizeSeverityCis(result["status"])
                 element["Description"] = result["test_desc"]
                 element["Remediation"] = result["remediation"]
                 element["Evidence"] = result["audit"]
@@ -50,6 +76,12 @@ def extractFromCis(output, resList=[]):
     resJson = json.dumps(resList)
     print(resJson)
     return resList
+
+def normalizeSeverityCis(string):
+    if string == "PASS":
+        return "High"
+    else:
+        return "Low"
 
 def divideCisJson(output):
     jsonList = output.split("\n")[:-1]
@@ -66,8 +98,9 @@ def extractFromHunter(output, resList=[]):
         element = {}
         element["Location"] = result["location"]
         element["Name"] = result["vulnerability"]
+        element["Result"] = "Fail"
         element["Category"] = result["category"]
-        element["Severity"] = result["severity"]
+        element["Severity"] = result["severity"].capitalize()
         element["Description"] = result["description"]
         element["Remediation"] = ""
         element["Evidence"] = result["evidence"]

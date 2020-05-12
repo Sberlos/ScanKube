@@ -4,6 +4,7 @@ import time
 import os
 from os import path
 from contextlib import contextmanager
+from pathlib import Path
 
 #import docker
 from kubernetes import client, config
@@ -138,6 +139,11 @@ def runMkit():
     """Run the mkit tool
     Returns the output in json format
     """
+    #Delete old results files
+    old_results = Path("results/results.json") 
+    old_results.unlink(missing_ok=True)
+    old_results = Path("results/raw-results.json") 
+    old_results.unlink(missing_ok=True)
     with cd("mkitMod"):
         subprocess.run(["make", "build"])
         subprocess.run(["make", "run-k8s"])
