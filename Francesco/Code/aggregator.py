@@ -78,7 +78,7 @@ def extractFromCis(output, resList=[]):
     return resList
 
 def normalizeSeverityCis(string):
-    if string == "PASS":
+    if string == "PASS" or string == "FAIL":
         return "High"
     else:
         return "Low"
