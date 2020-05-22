@@ -18,14 +18,16 @@ from aggregator import *
 
 def runTool(tool, htmlFlag):
     """Decide which tool to run based on the argument"""
+    outList = []
     if tool == "cis":
         out = runCisBench()
         outList = extractFromCis(out)
     elif tool == "kube-hunter":
         out = runHunter()
-        outList = extractFromHunter(hunterOut)
+        outList = extractFromHunter(out)
     elif tool == "kubesec":
-        runKubesec()
+        out = runKubesec()
+        outList = extractFromKubesec(out)
     elif tool == "mkit":
         runMkit()
         outList = extractFromMkit()
@@ -37,10 +39,8 @@ def runTool(tool, htmlFlag):
         # end
         hunterOut = runHunter()
         outList = extractFromHunter(hunterOut)
-        """
         kubesecOut = runKubesec()
-        tmpList = extractFromKubesec(kubesecOut, hunterList)
-        """
+        tmpList = extractFromKubesec(kubesecOut, outList)
         runMkit()
         outList = extractFromMkit(outList)
         cisOut = runCisBench()
@@ -143,8 +143,13 @@ def runKubesec():
     total_scan = []
     for f in files:
         out = subprocess.run(["./kubesec", "scan", f], capture_output=True, text=True)
-        total_scan.append(out.stdout)
-        print(out.stdout)
+        simpleExtract(out.stdout, total_scan)
+    return total_scan
+
+def simpleExtract(jsonString, outList=[]):
+    jsonD = json.loads(jsonString)
+    for el in jsonD:
+        outList.append(el)
 
 def runMkit():
     """Run the mkit tool

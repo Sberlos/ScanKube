@@ -111,4 +111,40 @@ def extractFromHunter(output, resList=[]):
     return resList
 
 def extractFromKubesec(output, resList=[]):
-    pass
+    """Extract the relevant fields from the Kubesec output and return them
+    inside a list that will be used to create the final json
+    """
+    for result in output:
+        Location = "YAML - " + result["object"]
+        if "critical" in result["scoring"]:
+            for cr in result["scoring"]["critical"]:
+                element = {}
+                element["Location"] = Location
+                element["Name"] = cr["selector"]
+                element["Result"] = "Fail"
+                element["Category"] = "Object definition in YAML file"
+                element["Severity"] = "High"
+                element["Description"] = cr["reason"]
+                element["Remediation"] = ("Remove/set to false this selector in "
+                    "the YAML definition")
+                element["Evidence"] = ("This option is defined in the YAML "
+                    "definition for " + result["object"])
+                resList.append(element)
+        if "advise" in result["scoring"]:
+            for ad in result["scoring"]["advise"]:
+                element = {}
+                element["Location"] = Location
+                element["Name"] = "Set " + ad["selector"]
+                element["Result"] = "Fail"
+                element["Category"] = "Object definition in YAML file"
+                element["Severity"] = "Low"
+                element["Description"] = ad["reason"]
+                element["Remediation"] = ("Configure this selector in the YAML "
+                    "definition of " + result["object"])
+                element["Evidence"] = ("This option is missing from the YAML "
+                    "definition for " + result["object"])
+                resList.append(element)
+
+    #resJson = json.dumps(resList)
+    #print(resJson)
+    return resList
