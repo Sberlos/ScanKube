@@ -198,7 +198,7 @@ def createHtml(outputData):
         f.write(html)
 
 def createHtmlTemplate(outputData):
-    resultTemplate = ("<div class=\"$Result result \"><br>"
+    resultTemplate = ("<div class=\"$Result $Severity result \"><br>"
             "<span class=\"title\"> $Location - $Name </span><br>"
             "Category: $Category - Severity: $Severity - Result: $Result <br>"
             "Description: $Description <br>"
