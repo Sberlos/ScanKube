@@ -148,3 +148,12 @@ def extractFromKubesec(output, resList=[]):
     #resJson = json.dumps(resList)
     #print(resJson)
     return resList
+
+def filterList(resList, field, condition):
+    """Filter the result list using a field and a condition"""
+    filteredList = []
+    for res in resList:
+        if res[field] == condition:
+            filteredList.append(res)
+
+    return filteredList

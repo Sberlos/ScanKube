@@ -16,7 +16,7 @@ import json
 from fetcher import *
 from aggregator import *
 
-def runTool(tool, htmlFlag):
+def runTool(tool, htmlFlag, onlyFailFlag, severity):
     """Decide which tool to run based on the argument"""
     outList = []
     if tool == "cis":
@@ -52,6 +52,13 @@ def runTool(tool, htmlFlag):
     else:
         print("Unexpected tool") #Shouldn't happen as there is the check before
         return
+
+    # I would prefer to combine this conditions in only one iteration
+    if onlyFailFlag:
+        outList = filterList(outList, "Result", "Fail")
+
+    if severity != "all":
+        outList = filterList(outList, "Severity", severity.capitalize())
 
     output(outList, htmlFlag)
 
@@ -236,12 +243,19 @@ def createHtmlTemplate(outputData):
 def parsing():
     """Parse the command line arguments"""
     parser = argparse.ArgumentParser()
-    parser.add_argument("tool", choices=["cis", "kube-hunter", "kubesec", "mkit",
-        "custom", "complete"], help="select the tool to run")
+    parser.add_argument("tool",
+            choices=["cis", "kube-hunter", "kubesec", "mkit", "custom", 
+                "complete"],
+            help="select the tool to run")
     parser.add_argument("-v", "--verbosity", action="count", default=0,
         help="increase output verbosity")
     parser.add_argument("-o", "--output", choices=["json", "html"],
         default="json", help="set the output type, default to json")
+    parser.add_argument("-f", "--only-fail", action="store_true",
+        help="return only failing tests")
+    parser.add_argument("-s", "--set-severity", default="all",
+        choices=["all", "high", "medium", "low"],
+        help="show results with specified severity")
     args = parser.parse_args()
     if args.verbosity >= 1:
         if args.tool == "complete":
@@ -252,7 +266,8 @@ def parsing():
         print("The output method selected is {}".format(args.output))
 
     htmlFlag = True if args.output == "html" else False
-    runTool(args.tool, htmlFlag)
+    #print(args)
+    runTool(args.tool, htmlFlag, args.only_fail, args.set_severity)
 
 if __name__ == '__main__':
     parsing()
