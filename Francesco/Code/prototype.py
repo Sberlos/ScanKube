@@ -16,41 +16,44 @@ import json
 from fetcher import *
 from aggregator import *
 
-def runTool(tool):
+def runTool(tool, htmlFlag):
     """Decide which tool to run based on the argument"""
     if tool == "cis":
         out = runCisBench()
-        extractFromCis(out)
+        outList = extractFromCis(out)
     elif tool == "kube-hunter":
-        hunterOut = runHunter()
-        hunterList = extractFromHunter(hunterOut)
+        out = runHunter()
+        outList = extractFromHunter(hunterOut)
     elif tool == "kubesec":
         runKubesec()
     elif tool == "mkit":
         runMkit()
-        mkitList = extractFromMkit()
+        outList = extractFromMkit()
     elif tool == "custom":
-        runCustom()
+        out = runCustom()
+        outList = extractFromCustom()
     elif tool == "complete":
         # All sequencial, could be parallelized if we merge the lists at the
         # end
         hunterOut = runHunter()
-        tmpList = extractFromHunter(hunterOut)
+        outList = extractFromHunter(hunterOut)
         """
         kubesecOut = runKubesec()
         tmpList = extractFromKubesec(kubesecOut, hunterList)
         """
         runMkit()
-        tmpList = extractFromMkit(tmpList)
+        outList = extractFromMkit(outList)
         cisOut = runCisBench()
-        tmpList = extractFromCis(cisOut, tmpList)
+        outList = extractFromCis(cisOut, outList)
         """
         customOut = runCustom()
         finalList = extractFromCustom(customOut, tmpList)
         """
-        output(tmpList, True)
     else:
         print("Unexpected tool") #Shouldn't happen as there is the check before
+        return
+
+    output(outList, htmlFlag)
 
 def runCisBench():
     """Run aqua-bench (an implementation of the cis benchmark) as Pod
@@ -232,16 +235,19 @@ def parsing():
         "custom", "complete"], help="select the tool to run")
     parser.add_argument("-v", "--verbosity", action="count", default=0,
         help="increase output verbosity")
+    parser.add_argument("-o", "--output", choices=["json", "html"],
+        default="json", help="set the output type, default to json")
     args = parser.parse_args()
-    if args.verbosity >= 2:
-        print("performing a check using {}".format(args.tool))
-        print("More descriptive stuff to be determined")
-        runTool(args.tool)
-    elif args.verbosity >= 1:
-        print("performing a check using {}".format(args.tool))
-        runTool(args.tool)
-    else:
-        runTool(args.tool)
+    if args.verbosity >= 1:
+        if args.tool == "complete":
+            print("performing a complete check")
+        else:
+            print("performing a check using {}".format(args.tool))
+    elif args.verbosity >= 2:
+        print("The output method selected is {}".format(args.output))
+
+    htmlFlag = True if args.output == "html" else False
+    runTool(args.tool, htmlFlag)
 
 if __name__ == '__main__':
     parsing()
