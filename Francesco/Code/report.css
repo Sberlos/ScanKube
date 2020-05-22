@@ -1,0 +1,30 @@
+h1 {
+    text-align: center;
+}
+
+#results {
+    max-width: 80vw;
+    margin: auto;
+    word-break: break-word;
+}
+
+.Pass {
+    background-color: lightgreen;
+}
+
+.Fail {
+    background-color: red;
+}
+
+.title {
+    font-size: 1.5em;
+}
+
+.result {
+    /*
+    margin-bottom: 1vh;
+    border-width: 3px;
+    */
+    margin-top: 5px;
+    border-style: solid;
+}

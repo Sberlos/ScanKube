@@ -74,7 +74,7 @@ build:
 
 run-k8s:
 	@echo "Running in $(IMAGEREPO):latest: $(WORKDIR)/$(CHECKK8S)"
-	$(K8SINSPECRUN) || exit 0
+	@$(K8SINSPECRUN) || exit 0
 run-gke:
 	$(call NDEF,project_id)
 	$(call NDEF,location)

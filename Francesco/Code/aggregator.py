@@ -35,7 +35,7 @@ def extractFromMkit(resList=[]):
 
 
     resJson = json.dumps(resList)
-    print(resJson)
+    #print(resJson)
     return resList
 
 def normalizeSeverityMkit(number):
@@ -74,7 +74,7 @@ def extractFromCis(output, resList=[]):
                 resList.append(element)
 
     resJson = json.dumps(resList)
-    print(resJson)
+    #print(resJson)
     return resList
 
 def normalizeSeverityCis(string):
@@ -107,5 +107,8 @@ def extractFromHunter(output, resList=[]):
         resList.append(element)
 
     resJson = json.dumps(resList)
-    print(resJson)
+    #print(resJson)
     return resList
+
+def extractFromKubesec(output, resList=[]):
+    pass

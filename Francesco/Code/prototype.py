@@ -5,6 +5,8 @@ import os
 from os import path
 from contextlib import contextmanager
 from pathlib import Path
+from string import Template
+from datetime import datetime
 
 #import docker
 from kubernetes import client, config
@@ -33,14 +35,20 @@ def runTool(tool):
         # All sequencial, could be parallelized if we merge the lists at the
         # end
         hunterOut = runHunter()
-        hunterList = extractFromHunter(hunterOut)
+        tmpList = extractFromHunter(hunterOut)
+        """
         kubesecOut = runKubesec()
         tmpList = extractFromKubesec(kubesecOut, hunterList)
-        mkitOut = runMkit()
-        tmpList = extractFromMkit(mkitOut, tmpList)
+        """
+        runMkit()
+        tmpList = extractFromMkit(tmpList)
+        cisOut = runCisBench()
+        tmpList = extractFromCis(cisOut, tmpList)
+        """
         customOut = runCustom()
         finalList = extractFromCustom(customOut, tmpList)
-        output(finalList)
+        """
+        output(tmpList, True)
     else:
         print("Unexpected tool") #Shouldn't happen as there is the check before
 
@@ -49,7 +57,7 @@ def runCisBench():
     """
     podLog = runToolAsJob("kube-bench", "kube-bench-job.yaml",
             "default")
-    print(podLog)
+    #print(podLog)
     return podLog
 
 def runCisBenchDocker():
@@ -66,7 +74,7 @@ def runCisBenchDocker():
     log = client.containers.run("aquasec/kube-bench:latest", command="node",
             environment=["KUBECONFIG=/.kube/config"], pid_mode="host",
             tty=False, volumes=volumesDict)
-    print(log)
+    #print(log)
 
 def runHunter():
     """Run kube-hunter
@@ -76,7 +84,7 @@ def runHunter():
     podLog = runToolAsJob("kube-hunter-json", "kube-hunter-job-json.yaml",
             "development")
     jsonReport = extractJson(podLog)
-    print(jsonReport)
+    #print(jsonReport)
 
     return jsonReport
 
@@ -159,6 +167,62 @@ def cd(newdir):
 
 def runCustom():
     pass
+
+def output(outputData, htmlFlag):
+    if htmlFlag:
+        createHtmlTemplate(outputData)
+    else:
+        #print(outputData)
+        print(json.dumps(outputData))
+
+def createHtml(outputData):
+    begin = "<html><head></head><body>"
+    end = "</body></html>"
+    content = ""
+    for res in outputData: #Change in Python string Template
+        content += "<div class=\"" + res["Result"] + "\">"
+        content += "<span class=\"title\">" + res["Location"] + " - " + res["Name"] + "</span>"
+        content += "<br>"
+        content += res["Severity"] + " - " + res["Result"]
+        content += "<br>"
+        content += "Description: " + res["Description"]
+        content += "<br>"
+        content += "Remediation: " + res["Remediation"]
+        content += "<br>"
+        content += "Evidence: " + res["Evidence"]
+        content += "<br>"
+        content += "</div>"
+    html = begin + content + end
+
+    with open(path.join(path.dirname(__file__), "report.html"), "w") as f:
+        f.write(html)
+
+def createHtmlTemplate(outputData):
+    resultTemplate = ("<div class=\"$Result result \"><br>"
+            "<span class=\"title\"> $Location - $Name </span><br>"
+            "Category: $Category - Severity: $Severity - Result: $Result <br>"
+            "Description: $Description <br>"
+            "Remediation: $Remediation <br>"
+            "Evidence: $Evidence <br>"
+            "</div>")
+    result = Template(resultTemplate)
+    results = ""
+    for res in outputData:
+        results += result.substitute(res)
+
+    page = Template("<html><head><style>$css</style></head><body>$title " + 
+            "<div id=\"results\"> $results </div>" + 
+            " </body></html>")
+
+    with open(path.join(path.dirname(__file__), "report.css")) as f:
+        css = f.read()
+
+    scanTime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    title = "<h1>Scan Report from {}</h1>".format(scanTime)
+    html = page.substitute(css=css, title=title, results=results)
+
+    with open(path.join(path.dirname(__file__), "reportT.html"), "w") as f:
+        f.write(html)
 
 # Command line parser logic
 def parsing():
