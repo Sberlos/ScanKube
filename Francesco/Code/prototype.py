@@ -15,10 +15,12 @@ import json
 
 from fetcher import *
 from aggregator import *
+from decider import *
 
 def runTool(tool, htmlFlag, onlyFailFlag, severity):
     """Decide which tool to run based on the argument"""
     outList = []
+    filtered = False
     if tool == "cis":
         out = runCisBench()
         outList = extractFromCis(out)
@@ -38,7 +40,9 @@ def runTool(tool, htmlFlag, onlyFailFlag, severity):
         # All sequencial, could be parallelized if we merge the lists at the
         # end
         hunterOut = runHunter()
-        outList = extractFromHunter(hunterOut)
+        # save hunter list in a special way for comparing with active later
+        hunterList = extractFromHunter(hunterOut)
+        outList = hunterList
         kubesecOut = runKubesec()
         tmpList = extractFromKubesec(kubesecOut, outList)
         runMkit()
@@ -49,13 +53,25 @@ def runTool(tool, htmlFlag, onlyFailFlag, severity):
         customOut = runCustom()
         finalList = extractFromCustom(customOut, tmpList)
         """
+        decided = decide(outList)
+        filtered = True
+        if decided[0]:
+            print("Starting active hunting")
+            activeOut = runActive()
+            #replace the old list or add? I think replace
+            activeList = extractFromHunter(activeOut)
+            integrateActive(hunterList, activeList, outList)
     else:
         print("Unexpected tool") #Shouldn't happen as there is the check before
         return
 
     # I would prefer to combine this conditions in only one iteration
     if onlyFailFlag:
-        outList = filterList(outList, "Result", "Fail")
+        if not filtered:
+            outList = filterList(outList, "Result", "Fail")
+        else:
+            # use the list computer in the decider
+            outList = decided[1]
 
     if severity != "all":
         outList = filterList(outList, "Severity", severity.capitalize())
@@ -163,9 +179,9 @@ def runMkit():
     Returns the output in json format
     """
     #Delete old results files
-    old_results = Path("results/results.json") 
+    old_results = Path("results/results.json")
     old_results.unlink(missing_ok=True)
-    old_results = Path("results/raw-results.json") 
+    old_results = Path("results/raw-results.json")
     old_results.unlink(missing_ok=True)
     with cd("mkitMod"):
         subprocess.run(["make", "build"])
@@ -182,6 +198,19 @@ def cd(newdir):
 
 def runCustom():
     pass
+
+def runActive():
+    """Run kube-hunter in active mode
+    Creates a Pod in the cluster used to run a Job that will try to expoloit
+    vulnerabilities
+    """
+    podLog = runToolAsJob("kube-hunter-active", "kube-hunter-job-active.yaml",
+            "development")
+    jsonReport = extractJson(podLog)
+    #print(jsonReport)
+
+    return jsonReport
+
 
 def output(outputData, htmlFlag):
     if htmlFlag:
@@ -225,8 +254,8 @@ def createHtmlTemplate(outputData):
     for res in outputData:
         results += result.substitute(res)
 
-    page = Template("<html><head><style>$css</style></head><body>$title " + 
-            "<div id=\"results\"> $results </div>" + 
+    page = Template("<html><head><style>$css</style></head><body>$title " +
+            "<div id=\"results\"> $results </div>" +
             " </body></html>")
 
     with open(path.join(path.dirname(__file__), "report.css")) as f:
@@ -244,7 +273,7 @@ def parsing():
     """Parse the command line arguments"""
     parser = argparse.ArgumentParser()
     parser.add_argument("tool",
-            choices=["cis", "kube-hunter", "kubesec", "mkit", "custom", 
+            choices=["cis", "kube-hunter", "kubesec", "mkit", "custom",
                 "complete"],
             help="select the tool to run")
     parser.add_argument("-v", "--verbosity", action="count", default=0,
