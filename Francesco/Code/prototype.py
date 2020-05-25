@@ -108,7 +108,7 @@ def runHunter():
     environment
     """
     podLog = runToolAsJob("kube-hunter-json", "kube-hunter-job-json.yaml",
-            "development")
+            "default")
     jsonReport = extractJson(podLog)
     #print(jsonReport)
 
@@ -205,7 +205,7 @@ def runActive():
     vulnerabilities
     """
     podLog = runToolAsJob("kube-hunter-active", "kube-hunter-job-active.yaml",
-            "development")
+            "default")
     jsonReport = extractJson(podLog)
     #print(jsonReport)
 
