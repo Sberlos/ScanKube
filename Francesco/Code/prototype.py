@@ -243,27 +243,56 @@ def createHtml(outputData):
 
 def createHtmlTemplate(outputData):
     resultTemplate = ("<div class=\"$Result $Severity result \"><br>"
-            "<span class=\"title\"> $Location - $Name </span><br>"
-            "Category: $Category - Severity: $Severity - Result: $Result <br>"
-            "Description: $Description <br>"
-            "Remediation: $Remediation <br>"
-            "Evidence: $Evidence <br>"
+            "<div class=\"exT\"><span class=\"title\"> $Location <br>"
+            "$Name </span></div>"
+            "<div class=\"lineR\"><span class=\"desc\">Category:</span> $Category - "
+            "<span class=\"desc\">Severity:</span> $Severity - "
+            "<span class=\"desc\">Result:</span> $Result </div>"
+            "<div class=\"lineR\"><span class=\"desc\">Description:</span> $Description </div>"
+            "<div class=\"lineR\"><span class=\"desc\">Remediation:</span> $Remediation </div>"
+            "<span class=\"desc\">Evidence:</span> $Evidence <br>"
             "</div>")
     result = Template(resultTemplate)
-    results = ""
+
+    passed = ""
+    high = ""
+    medium = ""
+    low = ""
     for res in outputData:
-        results += result.substitute(res)
+        if res["Result"] == "Pass":
+            passed += result.substitute(res)
+        elif res["Severity"] == "High":
+            high += result.substitute(res)
+        elif res["Severity"] == "Medium":
+            medium += result.substitute(res)
+        elif res["Severity"] == "Low":
+            low += result.substitute(res)
+
+    resultsTemplate = (
+        "<div id=\"high\" class=\"stitle\"><h3>High severity vulnerabilities</h3>$high </div>"
+        "<div id=\"medium\" class=\"stitle\"><h3>Medium severity vulnerabilities</h3>$medium </div>"
+        "<div id=\"low\" class=\"stitle\"><h3>Low severity vulnerabilities</h3>$low </div>"
+        "<div id=\"passed\" class=\"stitle\"><h3>Passed tests</h3>$passed </div>")
+    results = Template(resultsTemplate).substitute(high=high, medium=medium,
+            low=low, passed=passed)
+
+    menu = (
+        "<div class=\"element\"><a href=#high>High severity</a></div>"
+        "<div class=\"element\"><a href=#medium>Medium severity</a></div>"
+        "<div class=\"element\"><a href=#low>Low severity</a></div>"
+        "<div class=\"element\"><a href=#passed>Passed tests</a></div>")
 
     page = Template("<html><head><style>$css</style></head><body>$title " +
+            "<div id=\"content\"><div id=\"menu\">$menu</div>" +
             "<div id=\"results\"> $results </div>" +
-            " </body></html>")
+            "</div></body></html>")
 
     with open(path.join(path.dirname(__file__), "report.css")) as f:
         css = f.read()
 
     scanTime = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     title = "<h1>Scan Report from {}</h1>".format(scanTime)
-    html = page.substitute(css=css, title=title, results=results)
+    html = page.substitute(css=css, title=title, menu=menu, results=results)
 
     with open(path.join(path.dirname(__file__), "reportT.html"), "w") as f:
         f.write(html)
