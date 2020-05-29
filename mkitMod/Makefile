@@ -69,12 +69,10 @@ K8SINSPECRUN=$(K8SCOMMAND) --entrypoint $(WORKDIR)/$(CHECKK8S) $(IMAGEPATH)
 
 .PHONY: build run-k8s run-gke run-aks run-eks shell shell-k8s dev-k8s shell-gke dev-gke shell-aks dev-aks shell-eks dev-eks
 build:
-	@echo "Building $(IMAGEREPO):latest"
-	@$(DOCKERBUILD)
+	@$(DOCKERBUILD) > /dev/null
 
 run-k8s:
-	@echo "Running in $(IMAGEREPO):latest: $(WORKDIR)/$(CHECKK8S)"
-	@$(K8SINSPECRUN) || exit 0
+	@$(K8SINSPECRUN) > /dev/null || exit 0
 run-gke:
 	$(call NDEF,project_id)
 	$(call NDEF,location)

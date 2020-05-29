@@ -238,7 +238,7 @@ def createHtml(outputData):
         content += "</div>"
     html = begin + content + end
 
-    with open(path.join(path.dirname(__file__), "report.html"), "w") as f:
+    with open(path.join(path.dirname(__file__), "reportOld.html"), "w") as f:
         f.write(html)
 
 def createHtmlTemplate(outputData):
@@ -294,7 +294,7 @@ def createHtmlTemplate(outputData):
     title = "<h1>Scan Report from {}</h1>".format(scanTime)
     html = page.substitute(css=css, title=title, menu=menu, results=results)
 
-    with open(path.join(path.dirname(__file__), "reportT.html"), "w") as f:
+    with open(path.join(path.dirname(__file__), "report.html"), "w") as f:
         f.write(html)
 
 # Command line parser logic
