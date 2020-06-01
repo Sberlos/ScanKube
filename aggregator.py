@@ -103,6 +103,8 @@ def extractFromHunter(output, resList=[]):
         element["Severity"] = result["severity"].capitalize()
         element["Description"] = result["description"]
         element["Remediation"] = ""
+        if isinstance(result["evidence"], list):
+            result["evidence"].sort()
         element["Evidence"] = result["evidence"]
         resList.append(element)
 

@@ -49,6 +49,9 @@ def runTool(tool, htmlFlag, onlyFailFlag, severity):
         outList = extractFromMkit(outList)
         cisOut = runCisBench()
         outList = extractFromCis(cisOut, outList)
+
+        # sort for having a deterministic diff
+        outList = sorted(outList, key=lambda k: k["Name"]) 
         """
         customOut = runCustom()
         finalList = extractFromCustom(customOut, tmpList)
@@ -217,7 +220,7 @@ def output(outputData, htmlFlag):
         createHtmlTemplate(outputData)
     else:
         #print(outputData)
-        print(json.dumps(outputData))
+        print(json.dumps(outputData, indent=2)) #The indent should be a flag
 
 def createHtml(outputData):
     begin = "<html><head></head><body>"
