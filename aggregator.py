@@ -19,20 +19,26 @@ def extractFromMkit(resList=[]):
         if len(result["resources"]) > 0:
             for res in result["resources"]:
                 element = {}
+                element["Location"] = res["resource"]
                 element["Name"] = Name
+                element["Result"] = normalizeResultMkit(res["status"])
                 element["Category"] = Category
                 element["Severity"] = Severity
                 element["Description"] = Description
                 element["Remediation"] = Remediation
                 element["Evidence"] = Evidence
-                element["Location"] = res["resource"]
-                element["Result"] = normalizeResultMkit(res["status"])
                 resList.append(element)
         else: # This shouldn't happen, just in case
+            element = {}
             element["Location"] = result["category"]
+            element["Name"] = Name
             element["Result"] = "N/A"
+            element["Category"] = Category
+            element["Severity"] = Severity
+            element["Description"] = Description
+            element["Remediation"] = Remediation
+            element["Evidence"] = Evidence
             resList.append(element)
-
 
     resJson = json.dumps(resList)
     #print(resJson)
