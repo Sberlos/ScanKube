@@ -17,21 +17,21 @@ from fetcher import *
 from aggregator import *
 from decider import *
 
-def runTool(tool, htmlFlag, onlyFailFlag, severity):
+def runTool(tool, htmlFlag, onlyFailFlag, severity, verbosity):
     """Decide which tool to run based on the argument"""
     outList = []
     filtered = False
     if tool == "cis":
-        out = runCisBench()
+        out = runCisBench(verbosity)
         outList = extractFromCis(out)
     elif tool == "kube-hunter":
-        out = runHunter()
+        out = runHunter(verbosity)
         outList = extractFromHunter(out)
     elif tool == "kubesec":
-        out = runKubesec()
+        out = runKubesec(verbosity)
         outList = extractFromKubesec(out)
     elif tool == "mkit":
-        runMkit()
+        runMkit(verbosity)
         outList = extractFromMkit()
     elif tool == "custom":
         out = runCustom()
@@ -39,15 +39,15 @@ def runTool(tool, htmlFlag, onlyFailFlag, severity):
     elif tool == "complete":
         # All sequencial, could be parallelized if we merge the lists at the
         # end
-        hunterOut = runHunter()
+        hunterOut = runHunter(verbosity)
         # save hunter list in a special way for comparing with active later
         hunterList = extractFromHunter(hunterOut)
         outList = hunterList
-        kubesecOut = runKubesec()
+        kubesecOut = runKubesec(verbosity)
         tmpList = extractFromKubesec(kubesecOut, outList)
-        runMkit()
+        runMkit(verbosity)
         outList = extractFromMkit(outList)
-        cisOut = runCisBench()
+        cisOut = runCisBench(verbosity)
         outList = extractFromCis(cisOut, outList)
 
         # sort for having a deterministic diff
@@ -60,7 +60,7 @@ def runTool(tool, htmlFlag, onlyFailFlag, severity):
         filtered = True
         if decided[0]:
             print("Starting active hunting")
-            activeOut = runActive()
+            activeOut = runActive(verbosity)
             #replace the old list or add? I think replace
             activeList = extractFromHunter(activeOut)
             integrateActive(hunterList, activeList, outList)
@@ -81,11 +81,11 @@ def runTool(tool, htmlFlag, onlyFailFlag, severity):
 
     output(outList, htmlFlag)
 
-def runCisBench():
+def runCisBench(verbosity):
     """Run aqua-bench (an implementation of the cis benchmark) as Pod
     """
     podLog = runToolAsJob("kube-bench", "kube-bench-job.yaml",
-            "default")
+            "default", verbosity)
     #print(podLog)
     return podLog
 
@@ -105,13 +105,13 @@ def runCisBenchDocker():
             tty=False, volumes=volumesDict)
     #print(log)
 
-def runHunter():
+def runHunter(verbosity):
     """Run kube-hunter
     Creates a Pod in the cluster used to run a Job that will scan the
     environment
     """
     podLog = runToolAsJob("kube-hunter-json", "kube-hunter-job-json.yaml",
-            "default")
+            "default", verbosity)
     jsonReport = extractJson(podLog)
     #print(jsonReport)
 
@@ -126,19 +126,31 @@ def extractJson(log):
     json = log[start:]
     return json
 
-def runToolAsJob(jobName, jobFilename, namespace):
+def runToolAsJob(jobName, jobFilename, namespace, verbosity):
     """Helper function that runs a job in a pod given the name of the job
     the name of the spec file and the namespace to run.
     It extracts the log and return it to the parent, then remove the job and
     the pod.
     """
+    if verbosity >= 1:
+        print("Launching a Job named {} in namespace {} using file {}"
+                .format(jobName, namespace, jobFilename))
+    if verbosity >= 2:
+        print("Loading kubectl config information")
+
     config.load_kube_config()
     batch_v1 = client.BatchV1Api()
     core_v1 = client.CoreV1Api()
 
+    if verbosity >= 2:
+        print("Creating Job")
+
     with open(path.join(path.dirname(__file__), jobFilename)) as f:
         loadedJob = yaml.safe_load(f)
         resJob = batch_v1.create_namespaced_job(namespace=namespace, body=loadedJob)
+
+    if verbosity >= 2:
+        print("Waiting for Job to finish")
 
     jobStatus = batch_v1.read_namespaced_job_status(jobName, namespace)
 
@@ -146,6 +158,9 @@ def runToolAsJob(jobName, jobFilename, namespace):
     while jobStatus.status.completion_time is None:
         time.sleep(1)
         jobStatus = batch_v1.read_namespaced_job_status(jobName, namespace)
+
+    if verbosity >= 2:
+        print("Reading Pod logs")
 
     uid = resJob.metadata.labels["controller-uid"]
 
@@ -155,19 +170,27 @@ def runToolAsJob(jobName, jobFilename, namespace):
 
     podLog = core_v1.read_namespaced_pod_log(name=podName, namespace=namespace)
 
+    if verbosity >= 2:
+        print("Deleting the Job and the associated Pod")
+
     batch_v1.delete_namespaced_job(jobName, namespace)
     core_v1.delete_namespaced_pod(podName, namespace)
 
     return podLog
 
-def runKubesec():
+def runKubesec(verbosity):
     """Run the Kubesec tool agains all yaml files in the cluster
     """
-    files = complete_fetcher()
+    if verbosity >= 1:
+        print("Starting to fetch configuration files")
+
+    files = complete_fetcher(verbosity)
 
     # Execute kubesec scan on all files created
     total_scan = []
     for f in files:
+        if verbosity >= 2:
+            print("Running kubesec on {}".format(f))
         out = subprocess.run(["./kubesec", "scan", f], capture_output=True, text=True)
         simpleExtract(out.stdout, total_scan)
     return total_scan
@@ -177,17 +200,24 @@ def simpleExtract(jsonString, outList=[]):
     for el in jsonD:
         outList.append(el)
 
-def runMkit():
+def runMkit(verbosity):
     """Run the mkit tool
     Returns the output in json format
     """
+    if verbosity >= 2:
+        print("Cleaning previous results")
+
     #Delete old results files
     old_results = Path("results/results.json")
     old_results.unlink(missing_ok=True)
     old_results = Path("results/raw-results.json")
     old_results.unlink(missing_ok=True)
     with cd("mkitMod"):
+        if verbosity >= 2:
+            print("Building the Docker image")
         subprocess.run(["make", "build"])
+        if verbosity >= 2:
+            print("Launching the Mkit Docker container and start scanning")
         subprocess.run(["make", "run-k8s"])
 
 @contextmanager
@@ -308,7 +338,7 @@ def parsing():
             choices=["cis", "kube-hunter", "kubesec", "mkit", "custom",
                 "complete"],
             help="select the tool to run")
-    parser.add_argument("-v", "--verbosity", action="count", default=0,
+    parser.add_argument("-v", "--verbosity", type=int, default=1,
         help="increase output verbosity")
     parser.add_argument("-o", "--output", choices=["json", "html"],
         default="json", help="set the output type, default to json")
@@ -320,15 +350,16 @@ def parsing():
     args = parser.parse_args()
     if args.verbosity >= 1:
         if args.tool == "complete":
-            print("performing a complete check")
+            print("Performing a complete check")
         else:
-            print("performing a check using {}".format(args.tool))
+            print("Performing a check using {}".format(args.tool))
     elif args.verbosity >= 2:
         print("The output method selected is {}".format(args.output))
 
     htmlFlag = True if args.output == "html" else False
     #print(args)
-    runTool(args.tool, htmlFlag, args.only_fail, args.set_severity)
+    runTool(args.tool, htmlFlag, args.only_fail, args.set_severity,
+            args.verbosity)
 
 if __name__ == '__main__':
     parsing()

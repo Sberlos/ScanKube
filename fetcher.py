@@ -1,12 +1,16 @@
 from kubernetes import client, config
 from pathlib import Path
 
-def complete_fetcher():
+def complete_fetcher(verbosity):
     """Fetch all relevant yaml files from the cluster
     At the moment kubesec supports only deployments, stateful sets, daemon sets
     and pods
     """
     namespaces_list = ["default"] #not used right now
+
+    if verbosity >= 2:
+        print("Loading kubectl config information")
+
     config.load_kube_config()
     batch_v1 = client.BatchV1Api()
     apps_v1 = client.AppsV1Api()
@@ -46,15 +50,19 @@ def complete_fetcher():
 
     # extract the yaml files for every resource specified above
     for r in resources:
-        listObjects(r[0], r[1], files)
+        listObjects(r[0], r[1], files, verbosity)
 
     return files
 
-def listObjects(function, name, files):
+def listObjects(function, name, files, verbosity):
     """List all objects using the function for their type and create a yaml
     file with the spec
     """
     res = function() #query the API for the objects
+
+    if verbosity >= 2:
+        print("Creating YAML files for type {}".format(name))
+
     createYamlFiles(res, name, files)
 
 def createYamlFiles(response, name, files):
